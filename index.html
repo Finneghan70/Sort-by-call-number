@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Call Number Sorter</title>
+<style>
+  :root {
+    --bookW: 180px;
+    --binW: 230px;
+    --binGap: 18px;
+    --topPad: 18px;
+    --uiText: 32px;
+    --uiSub: 22px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    min-height: 100vh;
+    background: url("assets/bg/library_bg.png") center/cover no-repeat fixed;
+    overflow-x: hidden;
+  }
+
+  /* layout */
+  .wrap {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: var(--topPad) 18px 18px;
+    gap: 14px;
+  }
+  .topbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .titleblock {
+    background: rgba(255,255,255,0.78);
+    border-radius: 16px;
+    padding: 12px 16px;
+    backdrop-filter: blur(1.5px);
+  }
+  h1 {
+    margin: 0;
+    font-size: var(--uiText);
+    line-height: 1.1;
+    letter-spacing: .2px;
+  }
+  .sub {
+    margin-top: 6px;
+    font-size: var(--uiSub);
+  }
+  .controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: rgba(255,255,255,0.78);
+    border-radius: 16px;
+    padding: 10px 12px;
+    backdrop-filter: blur(1.5px);
+  }
+  select, button {
+    font-size: 18px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 2px solid rgba(0,0,0,0.15);
+    background: white;
+    cursor: pointer;
+  }
+  button:active { transform: scale(0.99); }
+
+  .stage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 0 0;
+  }
+
+  /* book card */
+  .book {
+    width: var(--bookW);
+    position: relative;
+    user-select: none;
+    touch-action: none;
+  }
+  .book img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .call {
+    position: absolute;
+    left: 16%;
+    right: 12%;
+    top: 38%;
+    transform: translateY(-50%);
+    text-align: center;
+    font-weight: 800;
+    font-size: 18px;
+    line-height: 1.05;
+    color: #111;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.35);
+    pointer-events: none;
+  }
+  .book.dragging { opacity: 0.65; }
+
+  /* feedback */
+  .feedback {
+    margin: 0 auto;
+    max-width: 900px;
+    background: rgba(255,255,255,0.78);
+    border-radius: 16px;
+    padding: 10px 14px;
+    font-size: 20px;
+    backdrop-filter: blur(1.5px);
+  }
+  .good { color: #0b6a2b; font-weight: 800; }
+  .bad { color: #8a1010; font-weight: 800; }
+
+  /* bins */
+  .bins {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: var(--binGap);
+    padding: 10px 0 0;
+  }
+  .bin {
+    width: var(--binW);
+    padding: 0; /* no padding */
+    margin: 0;
+    border-radius: 0;
+    background: transparent;
+    border: 0;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    touch-action: manipulation;
+  }
+  .bin img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .binLabel {
+    position: absolute;
+    left: 10%;
+    right: 10%;
+    top: 18px;
+    text-align: center;
+    font-weight: 900;
+    font-size: 20px;
+    color: #111;
+    letter-spacing: 0.5px;
+    background: rgba(255,255,255,0.70);
+    border-radius: 999px;
+    padding: 4px 10px;
+    box-shadow: none;
+    pointer-events: none;
+  }
+  .bin.drop {
+    outline: 5px solid rgba(0,0,0,0.12);
+    outline-offset: 6px;
+    border-radius: 12px;
+  }
+
+  /* responsive */
+  @media (max-width: 900px) {
+    :root {
+      --uiText: 28px;
+      --uiSub: 20px;
+      --binGap: 14px;
+    }
+  }
+  @media (max-width: 520px) {
+    :root {
+      --bookW: 165px;
+      --binW: 210px;
+      --uiText: 24px;
+      --uiSub: 18px;
+    }
+    .binLabel {
+    position: absolute;
+    left: 10%;
+    right: 10%;
+    top: 18px;
+    text-align: center;
+    font-weight: 900;
+    font-size: 20px;
+    color: #111;
+    letter-spacing: 0.5px;
+    background: rgba(255,255,255,0.70);
+    border-radius: 999px;
+    padding: 4px 10px;
+    box-shadow: none;
+    pointer-events: none;
+  }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="titleblock">
+        <h1>Call Number Sorter</h1>
+        <div class="sub">Drag the book into the matching bin (or tap a bin).</div>
+      </div>
+
+      <div class="controls">
+        <label for="levelSel" style="font-weight:800;">Level</label>
+        <select id="levelSel">
+          <option value="1">Level 1 (Dewey + E + GN)</option>
+          <option value="2">Level 2 (Dewey + EC + F + GN)</option>
+          <option value="3">Level 3 (All categories)</option>
+        </select>
+        <button id="resetBtn" type="button">Reset</button>
+      </div>
+    </div>
+
+    <div id="feedback" class="feedback">Ready!</div>
+
+    <div class="stage">
+      <div id="book" class="book" draggable="true" aria-label="Book card">
+        <img id="bookImg" src="" alt="Book"/>
+        <div id="callText" class="call"></div>
+      </div>
+    </div>
+
+    <div id="bins" class="bins" aria-label="Bins"></div>
+  </div>
+
+<script>
+const BOOK_IMAGES = [
+  "assets/books/book_1.png",
+  "assets/books/book_2.png",
+  "assets/books/book_3.png",
+  "assets/books/book_4.png",
+  "assets/books/book_5.png",
+  "assets/books/book_6.png",
+];
+
+const BIN_DEFS = {
+  "E":     { img: "assets/bins/bin_1.png", label: "E" },
+  "EC":    { img: "assets/bins/bin_2.png", label: "EC" },
+  "F":     { img: "assets/bins/bin_3.png", label: "F" },
+  "GN":    { img: "assets/bins/bin_4.png", label: "GN" },
+  "FNMI":  { img: "assets/bins/bin_5.png", label: "FNMI" },
+  "DEWEY": { img: "assets/bins/bin_6.png", label: "DEWEY" },
+};
+
+// 100 cards per level (from your library export)
+const LEVELS = {
+  1: [{"cat": "E", "call": "E OLD"}, {"cat": "E", "call": "E BUB"}, {"cat": "E", "call": "E PER"}, {"cat": "DEWEY", "call": "578 SAL"}, {"cat": "DEWEY", "call": "591.47/2"}, {"cat": "DEWEY", "call": "595.79/9"}, {"cat": "GN", "call": "GN BUR"}, {"cat": "GN", "call": "GN HAT"}, {"cat": "DEWEY", "call": "305 GRO"}, {"cat": "DEWEY", "call": "591 MIS"}, {"cat": "GN", "call": "GN GRE"}, {"cat": "E", "call": "E FAR"}, {"cat": "E", "call": "E ROW"}, {"cat": "DEWEY", "call": "553.8"}, {"cat": "E", "call": "E BOU"}, {"cat": "GN", "call": "GN CRA"}, {"cat": "DEWEY", "call": "290 ISL"}, {"cat": "DEWEY", "call": "796 BIK"}, {"cat": "DEWEY", "call": "530.4/078"}, {"cat": "E", "call": "E SWA"}, {"cat": "E", "call": "E SOU"}, {"cat": "E", "call": "E BUI"}, {"cat": "DEWEY", "call": "599 CAT"}, {"cat": "E", "call": "E WAT"}, {"cat": "DEWEY", "call": "523 PLA NEP"}, {"cat": "GN", "call": "GN PEL"}, {"cat": "E", "call": "E BUT"}, {"cat": "E", "call": "E JAY"}, {"cat": "GN", "call": "GN BEL"}, {"cat": "DEWEY", "call": "759 HAR"}, {"cat": "GN", "call": "GN HUN"}, {"cat": "E", "call": "E GAY"}, {"cat": "DEWEY", "call": "971 CAN"}, {"cat": "DEWEY", "call": "914 CHI"}, {"cat": "DEWEY", "call": "759 LEW"}, {"cat": "E", "call": "E KIR"}, {"cat": "GN", "call": "GN FAR"}, {"cat": "GN", "call": "GN DAD"}, {"cat": "GN", "call": "GN WAT"}, {"cat": "GN", "call": "GN HAL"}, {"cat": "DEWEY", "call": "553 ECO"}, {"cat": "E", "call": "E DIT"}, {"cat": "GN", "call": "GN TOW"}, {"cat": "DEWEY", "call": "100 INQ"}, {"cat": "DEWEY", "call": "523 PLA JUP"}, {"cat": "GN", "call": "GN BOL"}, {"cat": "GN", "call": "GN MIN"}, {"cat": "GN", "call": "GN MAR"}, {"cat": "DEWEY", "call": "914 RUS"}, {"cat": "E", "call": "E YAY"}, {"cat": "GN", "call": "GN ELL"}, {"cat": "GN", "call": "GN JAM"}, {"cat": "E", "call": "E BAI"}, {"cat": "E", "call": "E TON"}, {"cat": "E", "call": "E RIC"}, {"cat": "DEWEY", "call": "523 SOL"}, {"cat": "GN", "call": "GN KEA"}, {"cat": "E", "call": "E QUE"}, {"cat": "DEWEY", "call": "938 GRE"}, {"cat": "E", "call": "E WIT"}, {"cat": "E", "call": "E HUG"}, {"cat": "DEWEY", "call": "591 GEN"}, {"cat": "GN", "call": "GN STA"}, {"cat": "E", "call": "E KAR"}, {"cat": "E", "call": "E LUK"}, {"cat": "E", "call": "E NEP"}, {"cat": "GN", "call": "GN RUN"}, {"cat": "GN", "call": "GN GIG"}, {"cat": "DEWEY", "call": "290 JUD"}, {"cat": "DEWEY", "call": "920 MCC"}, {"cat": "DEWEY", "call": "302 INT"}, {"cat": "DEWEY", "call": "551 HYD"}, {"cat": "DEWEY", "call": "920 KIN"}, {"cat": "GN", "call": "GN FAJ"}, {"cat": "E", "call": "E SCO"}, {"cat": "GN", "call": "GN FEU"}, {"cat": "DEWEY", "call": "599 GIR"}, {"cat": "E", "call": "E AYR"}, {"cat": "E", "call": "E KIN"}, {"cat": "GN", "call": "GN SPI"}, {"cat": "E", "call": "E GUR"}, {"cat": "GN", "call": "GN SOO"}, {"cat": "GN", "call": "GN TAR"}, {"cat": "GN", "call": "GN BRO"}, {"cat": "GN", "call": "GN KIB"}, {"cat": "DEWEY", "call": "613 HEA"}, {"cat": "DEWEY", "call": "595 BEE"}, {"cat": "E", "call": "E END"}, {"cat": "DEWEY", "call": "811 LEE"}, {"cat": "E", "call": "E ZIE"}, {"cat": "GN", "call": "GN BRA"}, {"cat": "E", "call": "E CLI"}, {"cat": "E", "call": "E BOB"}, {"cat": "GN", "call": "GN SCR"}, {"cat": "GN", "call": "GN KRO"}, {"cat": "E", "call": "E JOY"}, {"cat": "GN", "call": "GN POK"}, {"cat": "GN", "call": "GN GON"}, {"cat": "DEWEY", "call": "920 HOM"}, {"cat": "DEWEY", "call": "971 PRO SN"}],
+  2: [{"cat": "GN", "call": "GN KRO"}, {"cat": "DEWEY", "call": "612 RES"}, {"cat": "GN", "call": "GN PIL"}, {"cat": "EC", "call": "EC STU"}, {"cat": "GN", "call": "GN SPO"}, {"cat": "F", "call": "F KOR"}, {"cat": "GN", "call": "GN BLA"}, {"cat": "GN", "call": "GN LLO"}, {"cat": "F", "call": "F BOW"}, {"cat": "GN", "call": "GN SUT"}, {"cat": "DEWEY", "call": "971 PRO ON"}, {"cat": "F", "call": "F BRO"}, {"cat": "DEWEY", "call": "420 ENG"}, {"cat": "DEWEY", "call": "670 MAN"}, {"cat": "GN", "call": "GN MAR"}, {"cat": "F", "call": "F GRI"}, {"cat": "GN", "call": "GN KIN"}, {"cat": "EC", "call": "EC ORY"}, {"cat": "DEWEY", "call": "971 CAN"}, {"cat": "EC", "call": "EC HIS"}, {"cat": "EC", "call": "EC FEU"}, {"cat": "DEWEY", "call": "370 EDU"}, {"cat": "EC", "call": "EC LUP"}, {"cat": "EC", "call": "EC ELL"}, {"cat": "F", "call": "F WAR"}, {"cat": "F", "call": "F BAI"}, {"cat": "DEWEY", "call": "597 CRO"}, {"cat": "EC", "call": "EC RID"}, {"cat": "DEWEY", "call": "591 MIS"}, {"cat": "EC", "call": "EC MIE"}, {"cat": "DEWEY", "call": "920 HOM"}, {"cat": "F", "call": "F DAD"}, {"cat": "DEWEY", "call": "100 INQ"}, {"cat": "GN", "call": "GN ALD"}, {"cat": "F", "call": "F IAM"}, {"cat": "F", "call": "F POB"}, {"cat": "DEWEY", "call": "507 EDU"}, {"cat": "F", "call": "F PET"}, {"cat": "F", "call": "F BAR"}, {"cat": "EC", "call": "EC MUN"}, {"cat": "GN", "call": "GN AAL"}, {"cat": "EC", "call": "EC SOO"}, {"cat": "EC", "call": "EC MAS"}, {"cat": "GN", "call": "GN BRU"}, {"cat": "EC", "call": "EC VER"}, {"cat": "EC", "call": "EC THA"}, {"cat": "F", "call": "F KEL"}, {"cat": "DEWEY", "call": "599.75/24"}, {"cat": "DEWEY", "call": "636 FAR"}, {"cat": "EC", "call": "EC SYL"}, {"cat": "F", "call": "F YOU"}, {"cat": "EC", "call": "EC RIS"}, {"cat": "GN", "call": "GN GRA"}, {"cat": "EC", "call": "EC DIC"}, {"cat": "GN", "call": "GN PIC"}, {"cat": "F", "call": "F FIT"}, {"cat": "EC", "call": "EC BER"}, {"cat": "DEWEY", "call": "595 ANT"}, {"cat": "GN", "call": "GN ODO"}, {"cat": "GN", "call": "GN BUR"}, {"cat": "EC", "call": "EC MAD"}, {"cat": "EC", "call": "EC BRA"}, {"cat": "DEWEY", "call": "290 CHR"}, {"cat": "EC", "call": "EC CHA"}, {"cat": "GN", "call": "GN DAD"}, {"cat": "F", "call": "F RIC"}, {"cat": "GN", "call": "GN BRA"}, {"cat": "DEWEY", "call": "792 STA"}, {"cat": "EC", "call": "EC DOA"}, {"cat": "DEWEY", "call": "914 ITA"}, {"cat": "F", "call": "F SEG"}, {"cat": "EC", "call": "EC MCK"}, {"cat": "F", "call": "F LEA"}, {"cat": "DEWEY", "call": "533 PNE"}, {"cat": "DEWEY", "call": "305 GRO"}, {"cat": "DEWEY", "call": "592 INV"}, {"cat": "F", "call": "F DAH"}, {"cat": "GN", "call": "GN GIB"}, {"cat": "DEWEY", "call": "920 YOU"}, {"cat": "F", "call": "F MES"}, {"cat": "F", "call": "F DUP"}, {"cat": "F", "call": "F SUL"}, {"cat": "GN", "call": "GN MON"}, {"cat": "DEWEY", "call": "811 ROV"}, {"cat": "GN", "call": "GN KUL"}, {"cat": "EC", "call": "EC KRU"}, {"cat": "GN", "call": "GN LEE"}, {"cat": "F", "call": "F CHA"}, {"cat": "F", "call": "F VIO"}, {"cat": "DEWEY", "call": "796 COM"}, {"cat": "EC", "call": "EC DYC"}, {"cat": "EC", "call": "EC MAY"}, {"cat": "DEWEY", "call": "612 DIG"}, {"cat": "DEWEY", "call": "510 MAT"}, {"cat": "F", "call": "F WAL"}, {"cat": "GN", "call": "GN BOL"}, {"cat": "GN", "call": "GN FER"}, {"cat": "F", "call": "F CUL"}, {"cat": "GN", "call": "GN KIB"}, {"cat": "GN", "call": "GN FAI"}],
+  3: [{"cat": "GN", "call": "GN STA"}, {"cat": "DEWEY", "call": "150 PSY"}, {"cat": "F", "call": "F SHU"}, {"cat": "E", "call": "E AUT"}, {"cat": "F", "call": "F COR"}, {"cat": "F", "call": "F JOH"}, {"cat": "EC", "call": "EC CUM"}, {"cat": "GN", "call": "GN FAJ"}, {"cat": "DEWEY", "call": "932 EGY"}, {"cat": "FNMI", "call": "FNMI F MOS"}, {"cat": "GN", "call": "GN DIS"}, {"cat": "E", "call": "E VIC"}, {"cat": "EC", "call": "EC APP"}, {"cat": "FNMI", "call": "FNMI E ANI"}, {"cat": "EC", "call": "EC ELL"}, {"cat": "F", "call": "F SYL"}, {"cat": "DEWEY", "call": "333 LAN"}, {"cat": "F", "call": "F ING"}, {"cat": "FNMI", "call": "FNMI F SHA"}, {"cat": "DEWEY", "call": "324 POL"}, {"cat": "E", "call": "E ASN"}, {"cat": "DEWEY", "call": "540 CHE"}, {"cat": "F", "call": "F WAR"}, {"cat": "DEWEY", "call": "030 ENC"}, {"cat": "F", "call": "F CRE"}, {"cat": "DEWEY", "call": "523 PLA NEP"}, {"cat": "FNMI", "call": "FNMI GN RAV"}, {"cat": "FNMI", "call": "FNMI F PIN"}, {"cat": "EC", "call": "EC FEN"}, {"cat": "E", "call": "E CUN"}, {"cat": "DEWEY", "call": "914 RUS"}, {"cat": "GN", "call": "GN KIB"}, {"cat": "GN", "call": "GN HOL"}, {"cat": "DEWEY", "call": "937 ROM"}, {"cat": "E", "call": "E COL"}, {"cat": "GN", "call": "GN HAD"}, {"cat": "F", "call": "F MOR"}, {"cat": "F", "call": "F WHY"}, {"cat": "E", "call": "E CUM"}, {"cat": "E", "call": "E LES"}, {"cat": "E", "call": "E SIS"}, {"cat": "GN", "call": "GN KRO"}, {"cat": "EC", "call": "EC VER"}, {"cat": "EC", "call": "EC HAL"}, {"cat": "E", "call": "E OLD"}, {"cat": "FNMI", "call": "FNMI GN DOW"}, {"cat": "DEWEY", "call": "530.4/078"}, {"cat": "GN", "call": "GN HER"}, {"cat": "GN", "call": "GN DUP"}, {"cat": "EC", "call": "EC STE"}, {"cat": "FNMI", "call": "FNMI NF EDU"}, {"cat": "DEWEY", "call": "513 ARI"}, {"cat": "E", "call": "E ATK"}, {"cat": "EC", "call": "EC RIS"}, {"cat": "DEWEY", "call": "598 OWL"}, {"cat": "F", "call": "F WEI"}, {"cat": "F", "call": "F HAM"}, {"cat": "GN", "call": "GN FAR"}, {"cat": "EC", "call": "EC COV"}, {"cat": "E", "call": "E PIC"}, {"cat": "DEWEY", "call": "557.3/7"}, {"cat": "GN", "call": "GN BAB"}, {"cat": "E", "call": "E ZHA"}, {"cat": "E", "call": "E JOY"}, {"cat": "F", "call": "F COL"}, {"cat": "F", "call": "F PUL"}, {"cat": "F", "call": "F DOW"}, {"cat": "E", "call": "E SIE"}, {"cat": "EC", "call": "EC TAR"}, {"cat": "E", "call": "E EHL"}, {"cat": "DEWEY", "call": "759 PIC"}, {"cat": "FNMI", "call": "FNMI E POE"}, {"cat": "F", "call": "F BRA"}, {"cat": "DEWEY", "call": "612 HUM"}, {"cat": "GN", "call": "GN MAR"}, {"cat": "F", "call": "F WUA"}, {"cat": "E", "call": "E KER"}, {"cat": "EC", "call": "EC WIL"}, {"cat": "EC", "call": "EC USB"}, {"cat": "DEWEY", "call": "597 LIZ"}, {"cat": "GN", "call": "GN GON"}, {"cat": "DEWEY", "call": "599 ELE"}, {"cat": "E", "call": "E HEL"}, {"cat": "E", "call": "E WOO"}, {"cat": "EC", "call": "EC SHE"}, {"cat": "F", "call": "F PAS"}, {"cat": "DEWEY", "call": "914 IRA"}, {"cat": "EC", "call": "EC KRU"}, {"cat": "GN", "call": "GN MIS"}, {"cat": "FNMI", "call": "FNMI F REI"}, {"cat": "F", "call": "F DUP"}, {"cat": "F", "call": "F SPI"}, {"cat": "F", "call": "F SUL"}, {"cat": "GN", "call": "GN BEL"}, {"cat": "DEWEY", "call": "793 MAG"}, {"cat": "DEWEY", "call": "759 LEW"}, {"cat": "FNMI", "call": "FNMI F CLA"}, {"cat": "EC", "call": "EC BRI"}, {"cat": "E", "call": "E NOV"}, {"cat": "E", "call": "E KAT"}],
+};
+
+let currentLevel = 1;
+let deck = [];
+let index = 0;
+let dragging = false;
+
+const elBook = document.getElementById("book");
+const elBookImg = document.getElementById("bookImg");
+const elCallText = document.getElementById("callText");
+const elBins = document.getElementById("bins");
+const elFeedback = document.getElementById("feedback");
+const elLevelSel = document.getElementById("levelSel");
+const elResetBtn = document.getElementById("resetBtn");
+
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  }
+
+  // Put the call number on two lines: prefix/number on line 1, cutter/author on line 2.
+  function formatCall(call) {
+    const parts = String(call || "").trim().split(/\s+/);
+    if (parts.length <= 1) return escapeHtml(parts[0] || "");
+    const first = parts[0];
+    const rest = parts.slice(1).join(" ");
+    return escapeHtml(first) + "<br>" + escapeHtml(rest);
+  }
+function setFeedback(msg, type=null) {
+  elFeedback.innerHTML = msg;
+  elFeedback.classList.remove("good","bad");
+  if (type) elFeedback.classList.add(type);
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function buildBinsForLevel(level) {
+  elBins.innerHTML = "";
+  const cats = Array.from(new Set(LEVELS[level].map(x => x.cat)));
+  // Keep a consistent order
+  const order = ["DEWEY","E","EC","F","GN","FNMI"];
+  cats.sort((a,b)=> order.indexOf(a)-order.indexOf(b));
+
+  cats.forEach(cat => {
+    const def = BIN_DEFS[cat];
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "bin";
+    btn.dataset.cat = cat;
+
+    const img = document.createElement("img");
+    img.src = def.img;
+    img.alt = cat + " bin";
+    btn.appendChild(img);
+
+    const lbl = document.createElement("div");
+    lbl.className = "binLabel";
+    lbl.textContent = def.label;
+    btn.appendChild(lbl);
+
+    // tap-to-sort
+    btn.addEventListener("click", () => {
+      if (!deck.length) return;
+      checkDrop(cat);
+    });
+
+    // drag events
+    btn.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      btn.classList.add("drop");
+    });
+    btn.addEventListener("dragleave", () => btn.classList.remove("drop"));
+    btn.addEventListener("drop", (e) => {
+      e.preventDefault();
+      btn.classList.remove("drop");
+      checkDrop(cat);
+    });
+
+    elBins.appendChild(btn);
+  });
+}
+
+function loadLevel(level) {
+  currentLevel = level;
+  deck = shuffle([...LEVELS[level]]);
+  index = 0;
+  buildBinsForLevel(level);
+  nextCard(true);
+}
+
+function nextCard(first=false) {
+  if (index >= deck.length) {
+    setFeedback('🎉 Finished Level ' + currentLevel + '! Click Reset to play again.', "good");
+    elBook.style.visibility = "hidden";
+    return;
+  }
+  elBook.style.visibility = "visible";
+
+  const item = deck[index];
+  const img = BOOK_IMAGES[Math.floor(Math.random()*BOOK_IMAGES.length)];
+  elBookImg.src = img;
+  elCallText.innerHTML = formatCall(item.call);
+
+  if (first) {
+    setFeedback("Ready! Drag the book into the matching bin (or tap a bin).");
+  } else {
+    setFeedback("Next book!");
+  }
+}
+
+function checkDrop(binCat) {
+  const item = deck[index];
+  if (!item) return;
+
+  if (binCat === item.cat) {
+    setFeedback("Correct!", "good");
+    index++;
+    setTimeout(()=>nextCard(false), 380);
+  } else {
+    setFeedback('Try again.', "bad");
+    // tiny shake
+    elBook.animate(
+      [
+        { transform: "translateX(0px)" },
+        { transform: "translateX(-10px)" },
+        { transform: "translateX(10px)" },
+        { transform: "translateX(-6px)" },
+        { transform: "translateX(6px)" },
+        { transform: "translateX(0px)" },
+      ],
+      { duration: 320 }
+    );
+  }
+}
+
+// drag start/end
+elBook.addEventListener("dragstart", () => {
+  elBook.classList.add("dragging");
+});
+elBook.addEventListener("dragend", () => {
+  elBook.classList.remove("dragging");
+});
+
+// controls
+elLevelSel.addEventListener("change", (e) => {
+  loadLevel(parseInt(e.target.value, 10));
+});
+elResetBtn.addEventListener("click", () => {
+  loadLevel(currentLevel);
+});
+
+// init
+loadLevel(1);
+</script>
+</body>
+</html>
