@@ -399,6 +399,87 @@ function checkDrop(binCat) {
   }
 }
 
+
+// touch drag (iPad / iOS Safari doesn't support HTML5 drag & drop reliably)
+(function enableTouchDrag(){
+  let ghost = null;
+  let activeBin = null;
+  let dragging = false;
+
+  function getPoint(ev){
+    if (ev.touches && ev.touches[0]) return { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
+    if (ev.changedTouches && ev.changedTouches[0]) return { x: ev.changedTouches[0].clientX, y: ev.changedTouches[0].clientY };
+    return { x: ev.clientX, y: ev.clientY };
+  }
+
+  function setActiveBin(binEl){
+    if (activeBin === binEl) return;
+    if (activeBin) activeBin.classList.remove("drop");
+    activeBin = binEl;
+    if (activeBin) activeBin.classList.add("drop");
+  }
+
+  function moveGhost(ev){
+    if (!dragging || !ghost) return;
+    ev.preventDefault();
+    const { x, y } = getPoint(ev);
+    ghost.style.left = (x - ghost.offsetWidth/2) + "px";
+    ghost.style.top  = (y - ghost.offsetHeight/2) + "px";
+
+    const el = document.elementFromPoint(x, y);
+    const bin = el ? el.closest(".bin") : null;
+    setActiveBin(bin);
+  }
+
+  function endDrag(ev){
+    if (!dragging) return;
+    ev.preventDefault();
+    dragging = false;
+
+    if (ghost) ghost.remove();
+    ghost = null;
+
+    elBook.classList.remove("dragging");
+
+    const bin = activeBin;
+    setActiveBin(null);
+
+    // if dropped over a bin, treat it as a drop
+    if (bin && deck.length) {
+      const cat = bin.dataset.cat;
+      if (cat) checkDrop(cat);
+    }
+  }
+
+  function startDrag(ev){
+    // only start touch dragging if there is an active card
+    if (!deck.length) return;
+    // iOS: must be non-passive to prevent scroll
+    ev.preventDefault();
+    dragging = true;
+
+    // create visual ghost
+    ghost = elBook.cloneNode(true);
+    ghost.style.position = "fixed";
+    ghost.style.pointerEvents = "none";
+    ghost.style.margin = "0";
+    ghost.style.zIndex = "9999";
+    ghost.style.width = getComputedStyle(elBook).width;
+    ghost.style.height = "auto";
+    document.body.appendChild(ghost);
+
+    elBook.classList.add("dragging");
+    moveGhost(ev);
+
+    window.addEventListener("touchmove", moveGhost, { passive:false });
+    window.addEventListener("touchend", endDrag, { passive:false });
+    window.addEventListener("touchcancel", endDrag, { passive:false });
+  }
+
+  // touch-only: keep desktop HTML5 drag for mouse
+  elBook.addEventListener("touchstart", startDrag, { passive:false });
+})();
+
 // drag start/end
 elBook.addEventListener("dragstart", () => {
   elBook.classList.add("dragging");
