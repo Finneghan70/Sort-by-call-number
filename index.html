@@ -201,6 +201,14 @@
     pointer-events: none;
   }
   }
+.levelButtons{ display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  .levelBtn{
+    appearance:none; border:0; cursor:pointer;
+    font-weight:800; font-size:22px;
+    padding:12px 16px; border-radius:14px;
+    background: rgba(255,255,255,0.92);
+  }
+  .levelBtn.active{ outline: 3px solid rgba(0,0,0,0.18); }
 </style>
 </head>
 <body>
@@ -213,11 +221,11 @@
 
       <div class="controls">
         <label for="levelSel" style="font-weight:800;">Level</label>
-        <select id="levelSel">
-          <option value="1">Level 1 (Dewey + E + GN)</option>
-          <option value="2">Level 2 (Dewey + EC + F + GN)</option>
-          <option value="3">Level 3 (All categories)</option>
-        </select>
+        <div id="levelButtons" class="levelButtons">
+  <button class="levelBtn" data-level="1" type="button">Level 1</button>
+  <button class="levelBtn" data-level="2" type="button">Level 2</button>
+  <button class="levelBtn" data-level="3" type="button">Level 3</button>
+</div>
         <button id="resetBtn" type="button">Reset</button>
       </div>
     </div>
@@ -270,7 +278,6 @@ const elBookImg = document.getElementById("bookImg");
 const elCallText = document.getElementById("callText");
 const elBins = document.getElementById("bins");
 const elFeedback = document.getElementById("feedback");
-const elLevelSel = document.getElementById("levelSel");
 const elResetBtn = document.getElementById("resetBtn");
 
 
@@ -348,6 +355,7 @@ function buildBinsForLevel(level) {
 
 function loadLevel(level) {
   currentLevel = level;
+  if (typeof setActiveLevelBtn === "function") setActiveLevelBtn(level);
   deck = shuffle([...LEVELS[level]]);
   index = 0;
   buildBinsForLevel(level);
@@ -495,9 +503,23 @@ elLevelSel.addEventListener("change", (e) => {
 elResetBtn.addEventListener("click", () => {
   loadLevel(currentLevel);
 });
+// Level buttons (iPad-safe: prevents accidental scrolling changing levels)
+const levelBtns = Array.from(document.querySelectorAll(".levelBtn"));
+function setActiveLevelBtn(level){
+  levelBtns.forEach(b=>b.classList.toggle("active", parseInt(b.dataset.level,10)===level));
+}
+levelBtns.forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    const lvl = parseInt(btn.dataset.level,10);
+    loadLevel(lvl);
+    setActiveLevelBtn(lvl);
+    window.scrollTo({top:0, behavior:"smooth"});
+  });
+});
 
 // init
 loadLevel(1);
+setActiveLevelBtn(1);
 </script>
 </body>
 </html>
